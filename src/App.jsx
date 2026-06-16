@@ -45,28 +45,38 @@ function VoiceButton({ onResult, disabled }) {
     }
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
     if (!SR) {
-      alert(
-        "Sorry, your browser does not support voice input.\nPlease use Chrome or Edge.",
-      );
+      alert("Use Chrome and allow microphone permission");
       return;
     }
 
     const rec = new SR();
     recRef.current = rec;
+
     rec.lang = "en-IN";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
+
+    rec.onstart = () => setListening(true);
 
     rec.onresult = (e) => {
-      const text = e.results[0][0].transcript;
-      onResult(text);
+      const text = e.results[0][0].transcript.trim();
+      console.log("Voice:", text);
+
+      if (text) {
+        setTimeout(() => {
+          onResult(text);
+        }, 0);
+      }
     };
+
+    rec.onerror = (e) => {
+      console.log("Mic error:", e.error);
+      setListening(false);
+    };
+
     rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
 
     rec.start();
-    setListening(true);
   };
 
   return (
@@ -130,21 +140,19 @@ function BillRow({ row, index, onChange, onDelete }) {
   };
 
   return (
-    <div className="fade-in flex items-center gap-2 p-3 bg-zinc-800/60 rounded-xl border border-zinc-700/50 group">
+    <div className="fade-in flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-zinc-800/60 rounded-xl border border-zinc-700/50 group">
       {/* Row number */}
-      <span className="text-zinc-500 text-sm font-mono w-5 text-center flex-shrink-0">
+      <span className="text-zinc-500 text-sm font-mono w-6 shrink-0 text-center flex-shrink-0">
         {index + 1}
       </span>
 
       {/* Description input */}
-      <input
-        type="text"
-        placeholder="Work done (e.g. Camshaft repair)"
-        value={row.description}
-        onChange={(e) => onChange(row.id, "description", e.target.value)}
-        className="flex-1 bg-zinc-900 text-white placeholder-zinc-600 rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500/30 transition min-w-0"
-      />
-
+     <input
+  type="text"
+  value={row.description}
+  onChange={(e) => onChange(row.id, "description", e.target.value)}
+  className="flex-1 min-w-0 bg-zinc-900 text-white placeholder-zinc-600 rounded-lg px-3 py-2 text-sm border border-zinc-700"
+/>
       {/* Mic */}
       <VoiceButton onResult={handleVoiceResult} />
 
@@ -152,7 +160,7 @@ function BillRow({ row, index, onChange, onDelete }) {
       <SpeakButton text={row.description} />
 
       {/* Cost input */}
-      <div className="relative flex-shrink-0">
+      <div className="relative w-full sm:w-28">
         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
           ₹
         </span>
@@ -467,7 +475,7 @@ export default function App() {
           </div>
 
           {/* Vehicle number */}
-          <div className="space-y-1">
+          {/* <div className="space-y-1">
             <label className="text-zinc-500 text-xs">
               Vehicle Number (optional)
             </label>
@@ -478,7 +486,7 @@ export default function App() {
               onChange={(e) => setVehicleNo(e.target.value)}
               className="w-full bg-zinc-800 text-white placeholder-zinc-600 rounded-xl px-4 py-3 border border-zinc-700 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500/30 transition uppercase"
             />
-          </div>
+          </div> */}
         </section>
 
         {/* ── Bill Items ── */}
