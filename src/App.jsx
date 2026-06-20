@@ -147,12 +147,12 @@ function BillRow({ row, index, onChange, onDelete }) {
       </span>
 
       {/* Description input */}
-     <input
-  type="text"
-  value={row.description}
-  onChange={(e) => onChange(row.id, "description", e.target.value)}
-  className="flex-1 min-w-0 bg-zinc-900 text-white placeholder-zinc-600 rounded-lg px-3 py-2 text-sm border border-zinc-700"
-/>
+      <input
+        type="text"
+        value={row.description}
+        onChange={(e) => onChange(row.id, "description", e.target.value)}
+        className="flex-1 min-w-0 bg-zinc-900 text-white placeholder-zinc-600 rounded-lg px-3 py-2 text-sm border border-zinc-700"
+      />
       {/* Mic */}
       <VoiceButton onResult={handleVoiceResult} />
 
@@ -187,21 +187,26 @@ function BillRow({ row, index, onChange, onDelete }) {
 
 // ── PDF Preview Modal ─────────────────────────────────────────────────────────
 
-function PDFPreview({ pdfUrl, onClose, onSend, customerPhone }) {
-  const [phone, setPhone] = useState(customerPhone || "");
+function PDFPreview({ pdfUrl, onClose, onSend }) {
+  // const [phone, setPhone] = useState(customerPhone || "");
 
-  const handleSend = () => {
-    const clean = phone.replace(/\D/g, "");
-    if (clean.length < 10) {
-      speak("Please enter a valid phone number");
-      alert("Please enter a valid 10-digit phone number");
-      return;
+  const handleSend = async () => {
+    const pdfBlob = await fetch(pdfUrl).then((res) => res.blob());
+
+    const file = new File([pdfBlob], "KGN-Bill.pdf", {
+      type: "application/pdf",
+    });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: "KGN AutoWorks Bill",
+        text: "Thank you for choosing KGN AutoWorks.",
+      });
+    } else {
+      alert("Sharing is not supported on this device.");
     }
-    const num = clean.startsWith("91") ? clean : `91${clean}`;
-    const msg = encodeURIComponent(
-      `Hello! Here is your bill from *KGN AutoWorks*.\nThank you for choosing us! 🔧`,
-    );
-    window.open(`https://wa.me/${num}?text=${msg}`, "_blank");
+
     onSend();
   };
 
@@ -235,10 +240,10 @@ function PDFPreview({ pdfUrl, onClose, onSend, customerPhone }) {
         {/* WhatsApp section */}
         <div className="p-4 border-t border-zinc-800 space-y-3">
           <p className="text-zinc-400 text-sm text-center">
-            Bill looks correct? Send to customer on WhatsApp
+            Bill is ready. Tap below to share it.
           </p>
           <div className="flex gap-2">
-            <div className="relative flex-1">
+            {/* <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
                 +91
               </span>
@@ -250,17 +255,17 @@ function PDFPreview({ pdfUrl, onClose, onSend, customerPhone }) {
                 maxLength={15}
                 className="w-full bg-zinc-800 text-white placeholder-zinc-600 rounded-xl pl-10 pr-3 py-3 border border-zinc-700 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500/30 transition"
               />
-            </div>
+            </div> */}
             <button
               onClick={handleSend}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-5 py-3 rounded-xl font-semibold transition shadow-lg shadow-green-900/30"
+              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white py-3 rounded-xl font-semibold transition shadow-lg shadow-green-900/30"
             >
               <Send size={18} />
-              Send
+              Share Bill
             </button>
           </div>
           <p className="text-zinc-600 text-xs text-center">
-            WhatsApp will open — share the PDF from your phone
+            Choose WhatsApp from the Share menu.
           </p>
         </div>
       </div>
@@ -356,8 +361,9 @@ export default function App() {
       doc.setTextColor(60, 60, 60);
       if (customerName) {
         doc.text("Customer:", 45, 165);
-        doc.setFont("helvetica", "normal");
-        doc.text(customerName, 110, 165);
+
+        doc.setFont("helvetica", "bold");
+        doc.text(customerName.toUpperCase(), 110, 165);
       }
       if (vehicleNo) {
         doc.setFont("helvetica", "bold");
@@ -376,9 +382,9 @@ export default function App() {
       body: validRows.map((r, i) => [
         i + 1,
         r.description || "-",
-        r.cost ? `₹ ${formatINR(r.cost)}` : "-",
+        formatINR(r.cost || 0),
       ]),
-      foot: [["", "TOTAL", `₹ ${formatINR(total)}`]],
+      foot: [["", "TOTAL", formatINR(total)]],
       margin: { left: 30, right: 30 },
       headStyles: {
         fillColor: [249, 115, 22],
@@ -395,8 +401,14 @@ export default function App() {
         fontSize: 12,
       },
       columnStyles: {
-        0: { cellWidth: 30, halign: "center" },
-        2: { halign: "right", cellWidth: 110 },
+        0: {
+          cellWidth: 30,
+          halign: "center",
+        },
+        2: {
+          cellWidth: 100,
+          halign: "right",
+        },
       },
       alternateRowStyles: { fillColor: [250, 250, 250] },
       styles: { cellPadding: 8 },
@@ -415,8 +427,11 @@ export default function App() {
     doc.setFillColor(249, 115, 22);
     doc.rect(0, doc.internal.pageSize.getHeight() - 6, W, 6, "F");
 
-    const blob = doc.output("bloburl");
-    setPdfUrl(blob);
+    const pdfBlob = doc.output("blob");
+
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+
+    setPdfUrl(pdfUrl);
     setShowPreview(true);
     speak("Bill is ready. Please check and send.");
   };
@@ -603,7 +618,7 @@ export default function App() {
           pdfUrl={pdfUrl}
           onClose={() => setShowPreview(false)}
           onSend={() => setShowPreview(false)}
-          customerPhone=""
+          // customerPhone=""
         />
       )}
     </div>
